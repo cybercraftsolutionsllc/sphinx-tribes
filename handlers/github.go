@@ -66,14 +66,21 @@ func GetOpenGithubIssues(w http.ResponseWriter, r *http.Request) {
 }
 
 func githubClient() *github.Client {
-	gh_token := os.Getenv("GITHUB_TOKEN")
+	return githubClientWithToken(os.Getenv("GITHUB_TOKEN"))
+}
+
+func githubClientWithToken(gh_token string) *github.Client {
+	gh_token = strings.TrimSpace(gh_token)
+	if gh_token == "" {
+		return github.NewClient(nil)
+	}
+
 	ctx := context.Background()
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: gh_token},
 	)
 	tc := oauth2.NewClient(ctx, ts)
-	gc := github.NewClient(tc)
-	return gc
+	return github.NewClient(tc)
 }
 
 func GetRepoIssues(owner string, repo string) ([]db.GithubIssue, error) {
