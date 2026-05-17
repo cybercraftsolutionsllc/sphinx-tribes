@@ -6,6 +6,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/google/go-github/v39/github"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGithubClientWithTokenDoesNotSendEmptyAuthorization(t *testing.T) {
@@ -56,4 +59,34 @@ func TestGithubClientWithTokenSendsAuthorizationWhenConfigured(t *testing.T) {
 	if _, _, err := client.Issues.Get(context.Background(), "owner", "repo", 1); err != nil {
 		t.Fatalf("expected issue request with a token to succeed: %v", err)
 	}
+}
+
+func TestGithubIssueToDBIssueHandlesNilFields(t *testing.T) {
+	issue := &github.Issue{
+		Title: github.String("Stakwork LN-auth"),
+		State: github.String("open"),
+	}
+
+	got := githubIssueToDBIssue(issue)
+
+	assert.Equal(t, "Stakwork LN-auth", got.Title)
+	assert.Equal(t, "open", got.Status)
+	assert.Equal(t, "", got.Assignee)
+	assert.Equal(t, "", got.Description)
+}
+
+func TestGithubIssueToDBIssueIncludesAssigneeAndBody(t *testing.T) {
+	issue := &github.Issue{
+		Title:    github.String("Add LN-AUTH to Stakwork"),
+		State:    github.String("closed"),
+		Body:     github.String("Issue body"),
+		Assignee: &github.User{Login: github.String("octocat")},
+	}
+
+	got := githubIssueToDBIssue(issue)
+
+	assert.Equal(t, "Add LN-AUTH to Stakwork", got.Title)
+	assert.Equal(t, "closed", got.Status)
+	assert.Equal(t, "octocat", got.Assignee)
+	assert.Equal(t, "Issue body", got.Description)
 }

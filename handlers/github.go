@@ -89,15 +89,7 @@ func GetRepoIssues(owner string, repo string) ([]db.GithubIssue, error) {
 	ret := []db.GithubIssue{}
 	if err == nil {
 		for _, iss := range issues {
-			assignee := ""
-			if iss.Assignee != nil {
-				assignee = *iss.Assignee.Login
-			}
-			ret = append(ret, db.GithubIssue{
-				Title:    *iss.Title,
-				Status:   *iss.State,
-				Assignee: assignee,
-			})
+			ret = append(ret, githubIssueToDBIssue(iss))
 		}
 	}
 	return ret, err
@@ -108,18 +100,34 @@ func GetIssue(owner string, repo string, id int) (db.GithubIssue, error) {
 	iss, _, err := client.Issues.Get(context.Background(), owner, repo, id)
 	issue := db.GithubIssue{}
 	if err == nil && iss != nil {
-		assignee := ""
-		if iss.Assignee != nil {
-			assignee = *iss.Assignee.Login
-		}
-		issue = db.GithubIssue{
-			Title:       *iss.Title,
-			Status:      *iss.State,
-			Assignee:    assignee,
-			Description: *iss.Body,
-		}
+		issue = githubIssueToDBIssue(iss)
 	}
 	return issue, err
+}
+
+func githubIssueToDBIssue(issue *github.Issue) db.GithubIssue {
+	if issue == nil {
+		return db.GithubIssue{}
+	}
+
+	assignee := ""
+	if issue.Assignee != nil {
+		assignee = githubString(issue.Assignee.Login)
+	}
+
+	return db.GithubIssue{
+		Title:       githubString(issue.Title),
+		Status:      githubString(issue.State),
+		Assignee:    assignee,
+		Description: githubString(issue.Body),
+	}
+}
+
+func githubString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func PubkeyForGithubUser(owner string) (string, error) {
