@@ -1165,7 +1165,7 @@ func TestGetBountyIndexById(t *testing.T) {
 			OwnerID:       bountyOwner.OwnerPubKey,
 			Show:          true,
 			Created:       now,
-			MaxStakers: 1,
+			MaxStakers:    1,
 		}
 
 		db.TestDB.CreateOrEditBounty(bounty)
@@ -1247,6 +1247,42 @@ func TestGetAllBounties(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.NotEmpty(t, returnedBounty)
+	})
+}
+
+func TestGetAllBountiesMyAssignedAuth(t *testing.T) {
+	mockHttpClient := mocks.NewHttpClient(t)
+
+	t.Run("requires auth for myAssigned filter", func(t *testing.T) {
+		mockDb := dbMocks.NewDatabase(t)
+		bHandler := NewBountyHandler(mockHttpClient, mockDb)
+
+		rr := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/gobounties/all?myAssigned=true", nil)
+
+		bHandler.GetAllBounties(rr, req)
+
+		assert.Equal(t, http.StatusUnauthorized, rr.Code)
+		mockDb.AssertNotCalled(t, "GetAllBounties", mock.Anything)
+	})
+
+	t.Run("passes authenticated pubkey to database filter", func(t *testing.T) {
+		mockDb := dbMocks.NewDatabase(t)
+		bHandler := NewBountyHandler(mockHttpClient, mockDb)
+
+		mockDb.On("GetAllBounties", mock.MatchedBy(func(r *http.Request) bool {
+			pubKeyFromAuth, _ := r.Context().Value(auth.ContextKey).(string)
+			return pubKeyFromAuth == "user_pubkey" && r.URL.Query().Get("myAssigned") == "true"
+		})).Return([]db.NewBounty{}).Once()
+
+		rr := httptest.NewRecorder()
+		ctx := context.WithValue(context.Background(), auth.ContextKey, "user_pubkey")
+		req := httptest.NewRequest(http.MethodGet, "/gobounties/all?myAssigned=true", nil).WithContext(ctx)
+
+		bHandler.GetAllBounties(rr, req)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		mockDb.AssertExpectations(t)
 	})
 }
 
